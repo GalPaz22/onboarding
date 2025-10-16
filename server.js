@@ -32,11 +32,11 @@ app.use(limiter);
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// Health check (no auth required)
+// Public routes (no auth required)
 app.use('/health', healthRouter);
+app.use('/api/onboarding', onboardingRouter); // Onboarding generates API key
 
-// Protected routes
-app.use('/api/onboarding', authenticateRequest, onboardingRouter);
+// Protected routes (require API key authentication)
 app.use('/api/reprocess', authenticateRequest, reprocessRouter);
 
 // Error handling

@@ -5,36 +5,42 @@ import { setJobState } from '../lib/syncStatus.js';
 const router = express.Router();
 
 router.post('/', async (req, res) => {
-  const {
-    dbName,
-    categories,
-    type: userTypes,
-    softCategories,
-    targetCategory,
-    missingSoftCategoryOnly,
-    reprocessHardCategories,
-    reprocessSoftCategories,
-    reprocessTypes,
-    reprocessVariants,
-    reprocessEmbeddings,
-    reprocessDescriptions,
-    reprocessAll
-  } = req.body;
-
-  console.log('📥 Received reprocess request:', { dbName });
-
-  if (!dbName || !categories) {
-    return res.status(400).json({ error: "Missing required data" });
-  }
-
   try {
+    // Get user data from authenticated request
+    const userEmail = req.user.email;
+    const dbName = req.user.dbName;
+    const storedCategories = req.user.credentials?.categories || [];
+    const storedTypes = req.user.credentials?.type || [];
+    const storedSoftCategories = req.user.credentials?.softCategories || [];
+    
+    console.log('📥 Received reprocess request from:', userEmail);
+    console.log('   dbName:', dbName);
+    console.log('   platform:', req.user.platform);
+    
+    // Allow overriding stored values with request body values
+    const {
+      categories,
+      type: userTypes,
+      softCategories,
+      targetCategory,
+      missingSoftCategoryOnly,
+      reprocessHardCategories,
+      reprocessSoftCategories,
+      reprocessTypes,
+      reprocessVariants,
+      reprocessEmbeddings,
+      reprocessDescriptions,
+      reprocessAll
+    } = req.body;
+
     await setJobState(dbName, "running");
 
     const payload = {
       dbName,
-      categories,
-      userTypes: userTypes || [],
-      softCategories: softCategories || [],
+      userEmail, // Include userEmail from authenticated user
+      categories: categories || storedCategories,
+      userTypes: userTypes || storedTypes,
+      softCategories: softCategories || storedSoftCategories,
       targetCategory: targetCategory || null,
       missingSoftCategoryOnly: missingSoftCategoryOnly || false,
       options: {
@@ -48,12 +54,23 @@ router.post('/', async (req, res) => {
       }
     };
 
+    console.log('✅ Reprocess payload prepared:', {
+      dbName: payload.dbName,
+      userEmail: payload.userEmail,
+      categoriesCount: payload.categories.length,
+      typesCount: payload.userTypes.length
+    });
+
     // Start processing in background
     processReprocessInBackground(payload);
 
     res.json({ 
       state: "running",
-      message: "Reprocessing started in background"
+      message: "Reprocessing started in background",
+      user: {
+        email: userEmail,
+        platform: req.user.platform
+      }
     });
 
   } catch (error) {
@@ -75,13 +92,13 @@ async function processReprocessInBackground(payload) {
 
 // Stop endpoint
 router.post('/stop', async (req, res) => {
-  const { dbName } = req.body;
-  
-  if (!dbName) {
-    return res.status(400).json({ error: "dbName is required" });
-  }
-  
   try {
+    // Get dbName from authenticated user
+    const dbName = req.user.dbName;
+    const userEmail = req.user.email;
+    
+    console.log('🛑 Stop request from:', userEmail, 'for dbName:', dbName);
+    
     const fs = await import('fs/promises');
     const path = await import('path');
     const os = await import('os');
@@ -90,7 +107,13 @@ router.post('/stop', async (req, res) => {
     const lockFilePath = path.join(LOCK_DIR, `reprocessing_${dbName}.lock`);
     
     await fs.unlink(lockFilePath);
-    res.json({ message: "Stop signal sent." });
+    res.json({ 
+      message: "Stop signal sent.",
+      user: {
+        email: userEmail,
+        dbName: dbName
+      }
+    });
   } catch (error) {
     if (error.code === "ENOENT") {
       res.json({ message: "Process already stopped or finished." });

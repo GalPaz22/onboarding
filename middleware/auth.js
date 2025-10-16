@@ -1,36 +1,59 @@
-import crypto from 'crypto';
+import clientPromise from '../lib/mongodb.js';
 
-export function authenticateRequest(req, res, next) {
-  const authHeader = req.headers.authorization;
-  const apiKey = req.headers['x-api-key'];
+/**
+ * Authenticate user by API key and attach user data to request
+ * The API key is stored in users.users collection with user's credentials
+ */
+export async function authenticateRequest(req, res, next) {
+  const apiKey = req.headers['x-api-key'] || req.query.api_key;
   
-  // Check for API key in header or query
-  const providedKey = apiKey || req.query.api_key;
-  const expectedKey = process.env.SERVICE_API_KEY;
+  console.log('🔐 Auth Check:');
+  console.log('   API key present:', !!apiKey);
   
-  if (!providedKey) {
+  if (!apiKey) {
+    console.log('   ❌ No API key provided');
     return res.status(401).json({ error: 'API key required' });
   }
   
-  if (!expectedKey) {
-    console.error('SERVICE_API_KEY not configured in environment');
-    return res.status(500).json({ error: 'Server configuration error' });
+  try {
+    // Look up user by API key in MongoDB
+    const client = await clientPromise;
+    const usersDb = client.db('users');
+    const usersCollection = usersDb.collection('users');
+    
+    console.log('   🔍 Looking up user with API key...');
+    
+    const user = await usersCollection.findOne({ apiKey: apiKey });
+    
+    if (!user) {
+      console.log('   ❌ Invalid API key - user not found');
+      return res.status(401).json({ error: 'Invalid API key' });
+    }
+    
+    console.log('   ✅ User authenticated:', user.email);
+    console.log('   📋 User platform:', user.platform);
+    console.log('   📋 User dbName:', user.dbName);
+    
+    // Attach user data to request for use in routes
+    req.user = {
+      email: user.email,
+      apiKey: user.apiKey,
+      platform: user.platform,
+      dbName: user.dbName,
+      credentials: user.credentials,
+      syncMode: user.syncMode,
+      context: user.context,
+      explain: user.explain,
+      onboardingComplete: user.onboardingComplete,
+      trialStatus: user.trialStatus,
+      trialStartedAt: user.trialStartedAt
+    };
+    
+    next();
+    
+  } catch (error) {
+    console.error('   ❌ Auth error:', error);
+    return res.status(500).json({ error: 'Authentication failed' });
   }
-  
-  // Constant-time comparison to prevent timing attacks
-  const providedBuffer = Buffer.from(providedKey);
-  const expectedBuffer = Buffer.from(expectedKey);
-  
-  if (providedBuffer.length !== expectedBuffer.length) {
-    return res.status(401).json({ error: 'Invalid API key' });
-  }
-  
-  const isValid = crypto.timingSafeEqual(providedBuffer, expectedBuffer);
-  
-  if (!isValid) {
-    return res.status(401).json({ error: 'Invalid API key' });
-  }
-  
-  next();
 }
 

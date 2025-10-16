@@ -1,12 +1,21 @@
 import express from 'express';
+import crypto from 'crypto';
 import clientPromise from '../lib/mongodb.js';
 import processShopify from '../lib/processShopify.js';
 import { processWooProducts } from '../lib/processWoo.js';
 import processWooImages from '../lib/processWooImages.js';
 import processShopifyImages from '../lib/processShopifyImages.js';
 import { setJobState } from '../lib/syncStatus.js';
+import { authenticateRequest } from '../middleware/auth.js';
 
 const router = express.Router();
+
+/**
+ * Generate a secure API key for a user
+ */
+function generateApiKey() {
+  return crypto.randomBytes(32).toString('hex');
+}
 
 /* ---------- credential validation helpers ----------------------- */
 async function validateShopifyCredentials(domain, token) {
@@ -396,6 +405,15 @@ router.post('/', async (req, res) => {
     // Check if the user already has a record in the database
     const existingUser = await users.findOne({ email: userEmail });
     const isFirstTimeOnboarding = !existingUser?.onboardingComplete;
+    
+    // Generate API key for new users, or keep existing one
+    let apiKey = existingUser?.apiKey;
+    if (!apiKey) {
+      apiKey = generateApiKey();
+      console.log('🔑 Generated new API key for user:', userEmail);
+    } else {
+      console.log('🔑 User already has API key');
+    }
 
     // Remove platform from credentials.
     const credentials =
@@ -405,6 +423,8 @@ router.post('/', async (req, res) => {
 
     // Update the user record with credentials and trial information
     const updateData = {
+      email: userEmail,
+      apiKey: apiKey, // Store the API key
       credentials,
       onboardingComplete: true,
       dbName,
@@ -470,6 +490,7 @@ router.post('/', async (req, res) => {
          success: true, 
          state: "done",
          isNewTrial: isFirstTimeOnboarding,
+         apiKey: apiKey, // Return API key to user
          logs: logs
        });
        
@@ -491,15 +512,14 @@ router.post('/', async (req, res) => {
 
 /* ------------------------------------------------------------------ */
 /* BONUS: tiny GET endpoint so the dashboard can poll job status      */
-/* /api/onboarding/status?dbName=myStore                              */
-router.get('/status', async (req, res) => {
-  const { dbName } = req.query;
-
-  if (!dbName) {
-    return res.status(400).json({ error: "dbName is required" });
-  }
-
+/* /api/onboarding/status - Uses API key to identify user            */
+router.get('/status', authenticateRequest, async (req, res) => {
   try {
+    // User is authenticated, use their dbName from the stored credentials
+    const dbName = req.user.dbName;
+    
+    console.log('📊 Checking status for user:', req.user.email, 'dbName:', dbName);
+
     const client = await clientPromise;
     const db = client.db(dbName);
     const statusCol = db.collection("sync_status");
@@ -509,7 +529,12 @@ router.get('/status', async (req, res) => {
       state: status?.state || "idle", 
       progress: status?.progress || 0,
       done: status?.done || 0,
-      total: status?.total || 0
+      total: status?.total || 0,
+      user: {
+        email: req.user.email,
+        platform: req.user.platform,
+        onboardingComplete: req.user.onboardingComplete
+      }
     });
   } catch (err) {
     console.error("GET /api/onboarding/status error:", err);
