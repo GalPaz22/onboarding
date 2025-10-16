@@ -30,16 +30,24 @@ export async function authenticateRequest(req, res, next) {
       return res.status(401).json({ error: 'Invalid API key' });
     }
     
+    // Fallback to credentials.dbName if top-level dbName is missing
+    const dbName = user.dbName || user.credentials?.dbName;
+    const platform = user.platform || (user.credentials?.wooUrl ? 'woocommerce' : user.credentials?.shopifyDomain ? 'shopify' : undefined);
+    
     console.log('   ✅ User authenticated:', user.email);
-    console.log('   📋 User platform:', user.platform);
-    console.log('   📋 User dbName:', user.dbName);
+    console.log('   📋 User platform:', platform);
+    console.log('   📋 User dbName:', dbName);
+    
+    if (!dbName) {
+      console.log('   ⚠️  Warning: User has no dbName (neither top-level nor in credentials)');
+    }
     
     // Attach user data to request for use in routes
     req.user = {
       email: user.email,
       apiKey: user.apiKey,
-      platform: user.platform,
-      dbName: user.dbName,
+      platform: platform,
+      dbName: dbName,
       credentials: user.credentials,
       syncMode: user.syncMode,
       context: user.context,
