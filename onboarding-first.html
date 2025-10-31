@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>First-Time Onboarding</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif; background: #0f172a; color: #0b1220; margin: 0; }
+    .wrap { max-width: 1000px; margin: 0 auto; padding: 24px; }
+    .card { background: #ffffff; border-radius: 12px; box-shadow: 0 8px 24px rgba(0,0,0,0.12); margin-bottom: 20px; overflow: hidden; }
+    .card .hd { padding: 18px 20px; border-bottom: 1px solid #eef2f7; font-weight: 700; font-size: 18px; background: #f8fafc; }
+    .card .bd { padding: 20px; }
+    .grid { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
+    label { display: block; font-size: 13px; color: #334155; margin-bottom: 6px; font-weight: 600; }
+    input, select, textarea { width: 100%; padding: 10px 12px; border: 1.5px solid #e2e8f0; border-radius: 8px; font-size: 14px; outline: none; transition: border-color .2s; background: #fff; }
+    input:focus, select:focus, textarea:focus { border-color: #6366f1; }
+    textarea { min-height: 60px; resize: vertical; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace; }
+    .muted { color: #64748b; font-size: 13px; }
+    .btn { display: inline-flex; align-items: center; gap: 8px; border: 0; background: #4f46e5; color: #fff; padding: 12px 18px; border-radius: 10px; cursor: pointer; font-weight: 700; box-shadow: 0 6px 16px rgba(79,70,229,.25); transition: transform .12s; }
+    .btn:hover { transform: translateY(-1px); }
+    .btn:disabled { opacity: .6; cursor: not-allowed; transform: none; }
+    .note { background: #ecfeff; color: #155e75; border-left: 4px solid #06b6d4; padding: 12px 14px; border-radius: 8px; }
+    .warn { background: #fff7ed; color: #9a3412; border-left: 4px solid #f59e0b; padding: 12px 14px; border-radius: 8px; }
+    .ok { background: #f0fdf4; color: #166534; border-left: 4px solid #22c55e; padding: 12px 14px; border-radius: 8px; }
+    .api-key { background: #fefce8; border: 1px dashed #fde68a; padding: 12px; border-radius: 8px; display: none; }
+    .api-key .val { word-break: break-all; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 13px; }
+    .tabs { display: flex; gap: 8px; border-bottom: 1px solid #e5e7eb; margin-bottom: 16px; }
+    .tab { background: none; border: 0; padding: 10px 14px; cursor: pointer; border-bottom: 2px solid transparent; font-weight: 700; color: #475569; }
+    .tab.active { color: #4f46e5; border-bottom-color: #4f46e5; }
+    .hidden { display: none; }
+    .inline { display: inline-flex; align-items: center; gap: 8px; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 13px; }
+  </style>
+  <script>
+    let currentPlatform = 'shopify';
+    function $(id){ return document.getElementById(id); }
+    function setPlatform(p){ currentPlatform = p; [ 'shopify','woocommerce' ].forEach(x=>$(x+'Box').classList.toggle('hidden', x!==p)); document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active', t.dataset.tab===p)); }
+    function baseUrl(){ return $('apiBaseUrl').value.replace(/\/$/, ''); }
+    function splitCsv(v){ return v.split(',').map(s=>s.trim()).filter(Boolean); }
+
+    async function startOnboarding(){
+      const btn = $('go');
+      btn.disabled = true; btn.textContent = 'Processing…';
+
+      const payload = {
+        platform: currentPlatform,
+        userEmail: $('userEmail').value.trim(),
+        dbName: $('dbName').value.trim(),
+        syncMode: $('syncMode').value,
+        categories: splitCsv($('categories').value),
+        type: splitCsv($('types').value),
+        softCategories: splitCsv($('softCategories').value),
+        context: $('context').value.trim() || undefined
+      };
+      if(currentPlatform==='shopify'){
+        payload.shopifyDomain = $('shopifyDomain').value.trim();
+        payload.shopifyToken = $('shopifyToken').value.trim();
+      } else {
+        payload.wooUrl = $('wooUrl').value.trim();
+        payload.wooKey = $('wooKey').value.trim();
+        payload.wooSecret = $('wooSecret').value.trim();
+      }
+
+      try{
+        const res = await fetch(baseUrl() + '/api/onboarding',{
+          method:'POST',
+          headers:{ 'Content-Type':'application/json' }, // first onboarding: no x-api-key
+          body: JSON.stringify(payload)
+        });
+        const data = await res.json().catch(()=>({ error:'Invalid JSON' }));
+        if(!res.ok){ throw new Error(data?.error || 'Onboarding failed'); }
+        // show api key
+        if(data.apiKey){
+          $('apiKeyValue').textContent = data.apiKey;
+          $('apiKeyBox').style.display = 'block';
+        }
+        $('result').innerHTML = '<div class="ok"><b>Success:</b> Onboarding complete. Save your API key below.</div>';
+      }catch(err){
+        $('result').innerHTML = '<div class="warn"><b>Error:</b> ' + (err?.message||String(err)) + '</div>';
+      }finally{
+        btn.disabled = false; btn.textContent = 'Start Onboarding';
+      }
+    }
+
+    function copyKey(){
+      const v = $('apiKeyValue').textContent.trim();
+      if(!v) return;
+      navigator.clipboard.writeText(v).then(()=>{ alert('API key copied'); });
+    }
+  </script>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card">
+      <div class="hd">First-Time Onboarding</div>
+      <div class="bd">
+        <div class="note" style="margin-bottom:12px;">
+          <div style="font-weight:700; margin-bottom:6px;">How this works</div>
+          <div class="mono">
+            1) You submit your store credentials and preferences (this call does NOT require an API key).<br/>
+            2) The server validates credentials, creates your user, and generates a unique API key.<br/>
+            3) Your credentials and settings are stored securely in the backend (MongoDB).<br/>
+            4) The response includes your API key — save it. All future calls identify you by this key.<br/>
+            5) Next, use Status and Reprocess with header <code>x-api-key: YOUR_API_KEY</code> — no need to resend credentials.
+          </div>
+        </div>
+
+        <div class="grid" style="margin-bottom:12px;">
+          <div>
+            <label>API Base URL</label>
+            <input id="apiBaseUrl" value="http://localhost:3001" />
+            <div class="muted">Example: http://localhost:3001 or your deployed URL</div>
+          </div>
+          <div>
+            <label>Sync Mode</label>
+            <select id="syncMode">
+              <option value="full">Full Processing (text)</option>
+              <option value="image">Image Only</option>
+            </select>
+            <div class="muted">Full uses text; Image leverages product images when available.</div>
+          </div>
+        </div>
+
+        <div class="grid" style="margin-bottom:12px;">
+          <div>
+            <label>User Email <span class="muted">(optional if your server injects it)</span></label>
+            <input id="userEmail" placeholder="user@example.com" />
+            <div class="muted">If your app has a session (e.g., NextAuth), call your own API route and pass the email to this service via the <code class="mono">x-user-email</code> header.</div>
+          </div>
+          <div>
+            <label>Database Name</label>
+            <input id="dbName" placeholder="my-store-db" />
+          </div>
+        </div>
+
+        <div class="tabs">
+          <button class="tab active" data-tab="shopify" onclick="setPlatform('shopify')">Shopify</button>
+          <button class="tab" data-tab="woocommerce" onclick="setPlatform('woocommerce')">WooCommerce</button>
+        </div>
+
+        <div id="shopifyBox">
+          <div class="grid">
+            <div>
+              <label>Shopify Domain</label>
+              <input id="shopifyDomain" placeholder="your-store.myshopify.com" />
+            </div>
+            <div>
+              <label>Shopify Access Token</label>
+              <input id="shopifyToken" placeholder="shpat_xxxxx" />
+            </div>
+          </div>
+        </div>
+
+        <div id="woocommerceBox" class="hidden">
+          <div class="grid">
+            <div>
+              <label>WooCommerce URL</label>
+              <input id="wooUrl" placeholder="https://your-store.com" />
+            </div>
+            <div>
+              <label>Consumer Key</label>
+              <input id="wooKey" placeholder="ck_xxxxx" />
+            </div>
+            <div>
+              <label>Consumer Secret</label>
+              <input id="wooSecret" placeholder="cs_xxxxx" />
+            </div>
+          </div>
+        </div>
+
+        <div class="grid" style="margin-top:12px;">
+          <div>
+            <label>Categories (comma-separated)</label>
+            <textarea id="categories" placeholder="Electronics, Clothing, Home & Garden"></textarea>
+          </div>
+          <div>
+            <label>Types (comma-separated)</label>
+            <textarea id="types" placeholder="Physical Products, Digital Products, Services"></textarea>
+          </div>
+          <div>
+            <label>Soft Categories (comma-separated)</label>
+            <textarea id="softCategories" placeholder="Featured, New Arrivals, Best Sellers"></textarea>
+          </div>
+        </div>
+
+        <div style="margin-top:12px;">
+          <label>Context (optional, used for image flow)</label>
+          <input id="context" placeholder="Short context about your catalog (e.g., Fashion & lifestyle)" />
+        </div>
+
+        <div style="margin-top:18px;" class="inline">
+          <button id="go" class="btn" onclick="startOnboarding()">Start Onboarding</button>
+          <div class="muted">First-time onboarding does not require an API key.</div>
+        </div>
+
+        <div id="result" style="margin-top:14px;"></div>
+
+        <div id="apiKeyBox" class="api-key" style="margin-top:12px;">
+          <div style="font-weight:700; margin-bottom:6px;">Your API Key (save securely)</div>
+          <div class="val" id="apiKeyValue"></div>
+          <div style="margin-top:8px;">
+            <button class="btn" onclick="copyKey()">Copy API Key</button>
+          </div>
+          <div class="muted" style="margin-top:8px;">Use this key for future calls as header <code class="mono">x-api-key: YOUR_API_KEY</code>.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="hd">Next Steps</div>
+      <div class="bd">
+        <ol class="mono" style="line-height:1.8;">
+          <li>Save the API key shown above.</li>
+          <li>Use the Status endpoint with your API key to check progress: <code>GET /api/onboarding/status</code></li>
+          <li>Trigger reprocessing later with your API key: <code>POST /api/reprocess</code> — your stored credentials are used automatically.</li>
+        </ol>
+        <div class="warn" style="margin-top:12px;">Security tip: Do not store the API key in browser localStorage/cookies. Keep it server-side or in your database associated with the authenticated user.</div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
+
+

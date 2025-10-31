@@ -1,0 +1,867 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>API Testing Interface</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 30px;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
+        }
+
+        .header p {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+
+        .api-config {
+            background: white;
+            border-radius: 12px;
+            padding: 25px;
+            margin-bottom: 20px;
+            box-shadow: 0 8px 16px rgba(0,0,0,0.1);
+        }
+
+        .api-config h3 {
+            color: #333;
+            margin-bottom: 15px;
+            font-size: 1.3em;
+        }
+
+        .input-group {
+            margin-bottom: 15px;
+        }
+
+        .input-group label {
+            display: block;
+            margin-bottom: 5px;
+            color: #555;
+            font-weight: 500;
+        }
+
+        .input-group input, .input-group select, .input-group textarea {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: border-color 0.3s;
+        }
+
+        .input-group input:focus, .input-group select:focus, .input-group textarea:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .input-group textarea {
+            min-height: 60px;
+            resize: vertical;
+            font-family: monospace;
+        }
+
+        .api-section {
+            background: white;
+            border-radius: 12px;
+            padding: 25px;
+            margin-bottom: 20px;
+            box-shadow: 0 8px 16px rgba(0,0,0,0.1);
+        }
+
+        .api-section h2 {
+            color: #333;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .badge {
+            font-size: 0.7em;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-weight: normal;
+        }
+
+        .badge.auth-required {
+            background: #ff6b6b;
+            color: white;
+        }
+
+        .badge.no-auth {
+            background: #51cf66;
+            color: white;
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+
+        .platform-section {
+            display: none;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            margin-top: 10px;
+        }
+
+        .platform-section.active {
+            display: block;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            background: #5a6268;
+        }
+
+        .btn-success {
+            background: #51cf66;
+            color: white;
+        }
+
+        .btn-success:hover {
+            background: #40c057;
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none !important;
+        }
+
+        .response-box {
+            margin-top: 20px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            border-left: 4px solid #667eea;
+            display: none;
+        }
+
+        .response-box.show {
+            display: block;
+        }
+
+        .response-box.error {
+            border-left-color: #ff6b6b;
+            background: #fff5f5;
+        }
+
+        .response-box.success {
+            border-left-color: #51cf66;
+            background: #f0fdf4;
+        }
+
+        .response-box h4 {
+            margin-bottom: 10px;
+            color: #333;
+        }
+
+        .response-content {
+            background: #fff;
+            padding: 15px;
+            border-radius: 6px;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            overflow-x: auto;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+
+        .api-key-display {
+            background: #fff3cd;
+            border: 2px solid #ffc107;
+            border-radius: 8px;
+            padding: 15px;
+            margin-top: 10px;
+            display: none;
+        }
+
+        .api-key-display.show {
+            display: block;
+        }
+
+        .api-key-display strong {
+            display: block;
+            margin-bottom: 8px;
+            color: #856404;
+        }
+
+        .api-key-value {
+            background: white;
+            padding: 10px;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 14px;
+            word-break: break-all;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .copy-btn {
+            padding: 6px 12px;
+            background: #ffc107;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 600;
+            color: #333;
+        }
+
+        .copy-btn:hover {
+            background: #ffcd39;
+        }
+
+        .loader {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .info-box {
+            background: #e7f3ff;
+            border-left: 4px solid #2196f3;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+        }
+
+        .info-box p {
+            margin: 5px 0;
+            color: #0c5460;
+        }
+
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+            border-bottom: 2px solid #e0e0e0;
+        }
+
+        .tab {
+            padding: 10px 20px;
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            color: #666;
+            border-bottom: 3px solid transparent;
+            transition: all 0.3s;
+        }
+
+        .tab.active {
+            color: #667eea;
+            border-bottom-color: #667eea;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🚀 API Testing Interface</h1>
+            <p>Test your onboarding API endpoints with API key authentication</p>
+        </div>
+
+        <!-- API Configuration -->
+        <div class="api-config">
+            <h3>⚙️ API Configuration</h3>
+            <div class="input-group">
+                <label for="apiBaseUrl">API Base URL</label>
+                <input type="text" id="apiBaseUrl" value="http://localhost:3001" placeholder="http://localhost:3001">
+            </div>
+            <div class="input-group">
+                <label for="savedApiKey">Your API Key (from onboarding)</label>
+                <input type="text" id="savedApiKey" placeholder="Enter your API key here for authenticated requests">
+            </div>
+        </div>
+
+        <!-- Health Check -->
+        <div class="api-section">
+            <h2>
+                💚 Health Check
+                <span class="badge no-auth">No Auth</span>
+            </h2>
+            <div class="info-box">
+                <p>Check if the API service is running and healthy.</p>
+            </div>
+            <button class="btn btn-success" onclick="checkHealth()">
+                <span>Check Health</span>
+            </button>
+            <div id="healthResponse" class="response-box"></div>
+        </div>
+
+        <!-- Onboarding -->
+        <div class="api-section">
+            <h2>
+                🎯 Onboarding (Get API Key)
+                <span class="badge no-auth">No Auth</span>
+            </h2>
+            <div class="info-box">
+                <p><strong>First-time users:</strong> Fill in all fields to get your unique API key.</p>
+                <p><strong>Re-onboarding:</strong> If you already have an API key, enter it above in "Your API Key" field and the system will use your stored credentials.</p>
+            </div>
+
+            <div class="tabs">
+                <button class="tab active" onclick="switchPlatform('shopify')">Shopify</button>
+                <button class="tab" onclick="switchPlatform('woocommerce')">WooCommerce</button>
+            </div>
+
+            <div class="form-row">
+                <div class="input-group">
+                    <label for="userEmail">User Email *</label>
+                    <input type="email" id="userEmail" placeholder="user@example.com" required>
+                </div>
+                <div class="input-group">
+                    <label for="dbName">Database Name *</label>
+                    <input type="text" id="dbName" placeholder="my-store-db" required>
+                </div>
+                <div class="input-group">
+                    <label for="syncMode">Sync Mode *</label>
+                    <select id="syncMode">
+                        <option value="full">Full Processing</option>
+                        <option value="image">Image Only</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Shopify Section -->
+            <div id="shopifySection" class="platform-section active">
+                <h4>Shopify Credentials</h4>
+                <div class="form-row">
+                    <div class="input-group">
+                        <label for="shopifyDomain">Shopify Domain</label>
+                        <input type="text" id="shopifyDomain" placeholder="your-store.myshopify.com">
+                    </div>
+                    <div class="input-group">
+                        <label for="shopifyToken">Shopify Access Token</label>
+                        <input type="text" id="shopifyToken" placeholder="shpat_xxxxx">
+                    </div>
+                </div>
+                <div class="input-group">
+                    <label for="context">Context (optional)</label>
+                    <input type="text" id="context" placeholder="Fashion and lifestyle products">
+                </div>
+            </div>
+
+            <!-- WooCommerce Section -->
+            <div id="woocommerceSection" class="platform-section">
+                <h4>WooCommerce Credentials</h4>
+                <div class="form-row">
+                    <div class="input-group">
+                        <label for="wooUrl">WooCommerce URL</label>
+                        <input type="text" id="wooUrl" placeholder="https://your-store.com">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="input-group">
+                        <label for="wooKey">Consumer Key</label>
+                        <input type="text" id="wooKey" placeholder="ck_xxxxx">
+                    </div>
+                    <div class="input-group">
+                        <label for="wooSecret">Consumer Secret</label>
+                        <input type="text" id="wooSecret" placeholder="cs_xxxxx">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Common Fields -->
+            <div class="form-row">
+                <div class="input-group">
+                    <label for="categories">Categories (comma-separated)</label>
+                    <textarea id="categories" placeholder="Electronics, Clothing, Home & Garden"></textarea>
+                </div>
+                <div class="input-group">
+                    <label for="types">Types (comma-separated)</label>
+                    <textarea id="types" placeholder="Physical Products, Digital Products, Services"></textarea>
+                </div>
+                <div class="input-group">
+                    <label for="softCategories">Soft Categories (comma-separated)</label>
+                    <textarea id="softCategories" placeholder="Featured, New Arrivals, Best Sellers"></textarea>
+                </div>
+            </div>
+
+            <button class="btn btn-primary" onclick="startOnboarding()" id="onboardingBtn">
+                <span>Start Onboarding</span>
+            </button>
+
+            <div id="apiKeyDisplay" class="api-key-display">
+                <strong>🎉 Your API Key (Save this!):</strong>
+                <div class="api-key-value">
+                    <span id="apiKeyValue"></span>
+                    <button class="copy-btn" onclick="copyApiKey()">Copy</button>
+                </div>
+            </div>
+
+            <div id="onboardingResponse" class="response-box"></div>
+        </div>
+
+        <!-- Status Check -->
+        <div class="api-section">
+            <h2>
+                📊 Check Status
+                <span class="badge auth-required">Auth Required</span>
+            </h2>
+            <div class="info-box">
+                <p>Check the processing status of your onboarding/reprocessing job.</p>
+                <p><strong>Requires:</strong> API key must be entered in the configuration section above.</p>
+            </div>
+            
+            <button class="btn btn-primary" onclick="checkStatus()">
+                <span>Check Status</span>
+            </button>
+            <button class="btn btn-secondary" onclick="startPolling()" id="pollBtn">
+                <span>Start Auto-Polling (2s)</span>
+            </button>
+            
+            <div id="statusResponse" class="response-box"></div>
+        </div>
+
+        <!-- Reprocess -->
+        <div class="api-section">
+            <h2>
+                🔄 Reprocess Products
+                <span class="badge auth-required">Auth Required</span>
+            </h2>
+            <div class="info-box">
+                <p><strong>🔑 API Key-Based Identification:</strong> This endpoint uses ONLY your API key to identify you.</p>
+                <p>✅ Automatically loads: Your email, database name, platform, and credentials from your stored profile.</p>
+                <p>✅ No need to re-enter credentials - just your API key!</p>
+                <p>📝 Optionally override categories/types below, or leave empty to use your stored values.</p>
+            </div>
+
+            <div class="form-row">
+                <div class="input-group">
+                    <label for="reprocessCategories">Categories (optional - override stored)</label>
+                    <textarea id="reprocessCategories" placeholder="Leave empty to use your stored categories"></textarea>
+                    <small style="color: #666;">Your stored categories will be used if empty</small>
+                </div>
+                <div class="input-group">
+                    <label for="reprocessTypes">Types (optional - override stored)</label>
+                    <textarea id="reprocessTypes" placeholder="Leave empty to use your stored types"></textarea>
+                    <small style="color: #666;">Your stored types will be used if empty</small>
+                </div>
+                <div class="input-group">
+                    <label for="reprocessSoftCategories">Soft Categories (optional - override stored)</label>
+                    <textarea id="reprocessSoftCategories" placeholder="Leave empty to use your stored soft categories"></textarea>
+                    <small style="color: #666;">Your stored soft categories will be used if empty</small>
+                </div>
+            </div>
+
+            <hr style="margin: 20px 0; border: none; border-top: 2px solid #e0e0e0;">
+
+            <h4 style="margin-bottom: 15px; color: #333;">Reprocessing Options</h4>
+
+            <div class="form-row">
+                <div class="input-group">
+                    <label>
+                        <input type="checkbox" id="reprocessAll" onchange="toggleReprocessOptions()">
+                        <strong>Reprocess All</strong> (overrides individual options below)
+                    </label>
+                </div>
+            </div>
+
+            <div class="form-row" id="individualOptions">
+                <div class="input-group">
+                    <label>
+                        <input type="checkbox" id="reprocessHardCategories" checked>
+                        Reprocess Hard Categories
+                    </label>
+                </div>
+                <div class="input-group">
+                    <label>
+                        <input type="checkbox" id="reprocessSoftCategoriesFlag" checked>
+                        Reprocess Soft Categories
+                    </label>
+                </div>
+                <div class="input-group">
+                    <label>
+                        <input type="checkbox" id="reprocessTypesFlag" checked>
+                        Reprocess Types
+                    </label>
+                </div>
+                <div class="input-group">
+                    <label>
+                        <input type="checkbox" id="reprocessVariants" checked>
+                        Reprocess Variants
+                    </label>
+                </div>
+                <div class="input-group">
+                    <label>
+                        <input type="checkbox" id="reprocessEmbeddings">
+                        Reprocess Embeddings
+                    </label>
+                </div>
+                <div class="input-group">
+                    <label>
+                        <input type="checkbox" id="reprocessDescriptions">
+                        Reprocess Descriptions
+                    </label>
+                </div>
+            </div>
+
+            <div style="background: #fff3cd; border-left: 4px solid #ffc107; padding: 15px; border-radius: 8px; margin: 20px 0;">
+                <p style="margin: 0; color: #856404;"><strong>💡 How it works:</strong></p>
+                <p style="margin: 5px 0 0 0; color: #856404;">
+                    1. You provide your API key above<br>
+                    2. Server identifies you and loads your stored credentials<br>
+                    3. Processing runs with your saved settings (or overrides if provided)<br>
+                    4. No need to enter Shopify/WooCommerce credentials again!
+                </p>
+            </div>
+
+            <button class="btn btn-primary" onclick="startReprocess()">
+                <span>Start Reprocessing</span>
+            </button>
+            <button class="btn btn-secondary" onclick="stopReprocess()" style="margin-left: 10px;">
+                <span>🛑 Stop Reprocessing</span>
+            </button>
+
+            <div id="reprocessResponse" class="response-box"></div>
+        </div>
+    </div>
+
+    <script>
+        let currentPlatform = 'shopify';
+        let pollingInterval = null;
+
+        function switchPlatform(platform) {
+            currentPlatform = platform;
+            
+            // Update tabs
+            document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
+            event.target.classList.add('active');
+            
+            // Update sections
+            document.getElementById('shopifySection').classList.toggle('active', platform === 'shopify');
+            document.getElementById('woocommerceSection').classList.toggle('active', platform === 'woocommerce');
+        }
+
+        function toggleReprocessOptions() {
+            const reprocessAll = document.getElementById('reprocessAll').checked;
+            const options = document.querySelectorAll('#individualOptions input[type="checkbox"]');
+            options.forEach(opt => {
+                opt.disabled = reprocessAll;
+                if (reprocessAll) opt.checked = false;
+            });
+        }
+
+        function getBaseUrl() {
+            return document.getElementById('apiBaseUrl').value.replace(/\/$/, '');
+        }
+
+        function getApiKey() {
+            return document.getElementById('savedApiKey').value.trim();
+        }
+
+        function showResponse(elementId, data, isError = false) {
+            const responseBox = document.getElementById(elementId);
+            responseBox.className = `response-box show ${isError ? 'error' : 'success'}`;
+            responseBox.innerHTML = `
+                <h4>${isError ? '❌ Error' : '✅ Success'}</h4>
+                <div class="response-content">${JSON.stringify(data, null, 2)}</div>
+            `;
+        }
+
+        function showLoader(buttonId) {
+            const btn = document.getElementById(buttonId);
+            if (btn) {
+                btn.disabled = true;
+                btn.innerHTML = '<div class="loader"></div> <span>Processing...</span>';
+            }
+        }
+
+        function hideLoader(buttonId, originalText) {
+            const btn = document.getElementById(buttonId);
+            if (btn) {
+                btn.disabled = false;
+                btn.innerHTML = `<span>${originalText}</span>`;
+            }
+        }
+
+        async function checkHealth() {
+            try {
+                const response = await fetch(`${getBaseUrl()}/health`);
+                const data = await response.json();
+                showResponse('healthResponse', data, !response.ok);
+            } catch (error) {
+                showResponse('healthResponse', { error: error.message }, true);
+            }
+        }
+
+        async function startOnboarding() {
+            const btn = document.getElementById('onboardingBtn');
+            btn.disabled = true;
+            btn.innerHTML = '<div class="loader"></div> <span>Processing...</span>';
+
+            try {
+                const apiKey = getApiKey();
+                const headers = {
+                    'Content-Type': 'application/json'
+                };
+                
+                // If API key is provided, include it for re-onboarding
+                if (apiKey) {
+                    headers['x-api-key'] = apiKey;
+                }
+
+                const payload = {
+                    platform: currentPlatform,
+                    userEmail: document.getElementById('userEmail').value,
+                    dbName: document.getElementById('dbName').value,
+                    syncMode: document.getElementById('syncMode').value,
+                    categories: document.getElementById('categories').value.split(',').map(s => s.trim()).filter(Boolean),
+                    type: document.getElementById('types').value.split(',').map(s => s.trim()).filter(Boolean),
+                    softCategories: document.getElementById('softCategories').value.split(',').map(s => s.trim()).filter(Boolean)
+                };
+
+                if (currentPlatform === 'shopify') {
+                    payload.shopifyDomain = document.getElementById('shopifyDomain').value;
+                    payload.shopifyToken = document.getElementById('shopifyToken').value;
+                    payload.context = document.getElementById('context').value;
+                } else {
+                    payload.wooUrl = document.getElementById('wooUrl').value;
+                    payload.wooKey = document.getElementById('wooKey').value;
+                    payload.wooSecret = document.getElementById('wooSecret').value;
+                }
+
+                const response = await fetch(`${getBaseUrl()}/api/onboarding`, {
+                    method: 'POST',
+                    headers: headers,
+                    body: JSON.stringify(payload)
+                });
+
+                const data = await response.json();
+                
+                if (response.ok && data.apiKey) {
+                    // Show API key
+                    document.getElementById('apiKeyValue').textContent = data.apiKey;
+                    document.getElementById('apiKeyDisplay').classList.add('show');
+                    
+                    // Auto-fill API key in config
+                    document.getElementById('savedApiKey').value = data.apiKey;
+                }
+                
+                showResponse('onboardingResponse', data, !response.ok);
+            } catch (error) {
+                showResponse('onboardingResponse', { error: error.message }, true);
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = '<span>Start Onboarding</span>';
+            }
+        }
+
+        function copyApiKey() {
+            const apiKey = document.getElementById('apiKeyValue').textContent;
+            navigator.clipboard.writeText(apiKey).then(() => {
+                alert('API key copied to clipboard!');
+            });
+        }
+
+        async function checkStatus() {
+            const apiKey = getApiKey();
+            if (!apiKey) {
+                alert('Please enter your API key in the configuration section first!');
+                return;
+            }
+
+            try {
+                const response = await fetch(`${getBaseUrl()}/api/onboarding/status`, {
+                    headers: {
+                        'x-api-key': apiKey
+                    }
+                });
+
+                const data = await response.json();
+                showResponse('statusResponse', data, !response.ok);
+            } catch (error) {
+                showResponse('statusResponse', { error: error.message }, true);
+            }
+        }
+
+        function startPolling() {
+            const pollBtn = document.getElementById('pollBtn');
+            
+            if (pollingInterval) {
+                // Stop polling
+                clearInterval(pollingInterval);
+                pollingInterval = null;
+                pollBtn.innerHTML = '<span>Start Auto-Polling (2s)</span>';
+                pollBtn.classList.remove('btn-success');
+                pollBtn.classList.add('btn-secondary');
+            } else {
+                // Start polling
+                pollingInterval = setInterval(checkStatus, 2000);
+                pollBtn.innerHTML = '<span>⏸️ Stop Polling</span>';
+                pollBtn.classList.remove('btn-secondary');
+                pollBtn.classList.add('btn-success');
+                checkStatus(); // Check immediately
+            }
+        }
+
+        async function startReprocess() {
+            const apiKey = getApiKey();
+            if (!apiKey) {
+                alert('⚠️ Please enter your API key in the configuration section first!\n\nYour API key is used to identify you and load your stored credentials automatically.');
+                return;
+            }
+
+            try {
+                const payload = {};
+
+                // Optional overrides (leave empty to use stored values)
+                const cats = document.getElementById('reprocessCategories').value.split(',').map(s => s.trim()).filter(Boolean);
+                const types = document.getElementById('reprocessTypes').value.split(',').map(s => s.trim()).filter(Boolean);
+                const softCats = document.getElementById('reprocessSoftCategories').value.split(',').map(s => s.trim()).filter(Boolean);
+
+                if (cats.length) payload.categories = cats;
+                if (types.length) payload.type = types;
+                if (softCats.length) payload.softCategories = softCats;
+
+                // Reprocess options
+                if (document.getElementById('reprocessAll').checked) {
+                    payload.reprocessAll = true;
+                } else {
+                    payload.reprocessHardCategories = document.getElementById('reprocessHardCategories').checked;
+                    payload.reprocessSoftCategories = document.getElementById('reprocessSoftCategoriesFlag').checked;
+                    payload.reprocessTypes = document.getElementById('reprocessTypesFlag').checked;
+                    payload.reprocessVariants = document.getElementById('reprocessVariants').checked;
+                    payload.reprocessEmbeddings = document.getElementById('reprocessEmbeddings').checked;
+                    payload.reprocessDescriptions = document.getElementById('reprocessDescriptions').checked;
+                }
+
+                console.log('🔄 Starting reprocess with API key authentication');
+                console.log('📦 Payload:', payload);
+
+                const response = await fetch(`${getBaseUrl()}/api/reprocess`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'x-api-key': apiKey
+                    },
+                    body: JSON.stringify(payload)
+                });
+
+                const data = await response.json();
+                showResponse('reprocessResponse', data, !response.ok);
+                
+                if (response.ok) {
+                    console.log('✅ Reprocess started successfully');
+                    console.log('👤 User:', data.user);
+                }
+            } catch (error) {
+                console.error('❌ Reprocess error:', error);
+                showResponse('reprocessResponse', { error: error.message }, true);
+            }
+        }
+
+        async function stopReprocess() {
+            const apiKey = getApiKey();
+            if (!apiKey) {
+                alert('⚠️ Please enter your API key in the configuration section first!');
+                return;
+            }
+
+            if (!confirm('Are you sure you want to stop the reprocessing job?')) {
+                return;
+            }
+
+            try {
+                console.log('🛑 Sending stop signal...');
+
+                const response = await fetch(`${getBaseUrl()}/api/reprocess/stop`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'x-api-key': apiKey
+                    }
+                });
+
+                const data = await response.json();
+                showResponse('reprocessResponse', data, !response.ok);
+                
+                if (response.ok) {
+                    console.log('✅ Stop signal sent successfully');
+                }
+            } catch (error) {
+                console.error('❌ Stop reprocess error:', error);
+                showResponse('reprocessResponse', { error: error.message }, true);
+            }
+        }
+    </script>
+</body>
+</html>
+

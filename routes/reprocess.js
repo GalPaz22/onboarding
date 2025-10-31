@@ -6,12 +6,31 @@ const router = express.Router();
 
 router.post('/', async (req, res) => {
   try {
+    console.log('📊 [REPROCESS] Checking authenticated user data:');
+    console.log('   req.user exists:', !!req.user);
+    console.log('   req.user:', req.user ? 'present' : 'MISSING');
+    
     // Get user data from authenticated request
-    const userEmail = req.user.email;
-    const dbName = req.user.dbName;
-    const storedCategories = req.user.credentials?.categories || [];
-    const storedTypes = req.user.credentials?.type || [];
-    const storedSoftCategories = req.user.credentials?.softCategories || [];
+    const userEmail = req.user?.email;
+    const dbName = req.user?.dbName;
+    const storedCategories = req.user?.credentials?.categories || [];
+    const storedTypes = req.user?.credentials?.type || [];
+    const storedSoftCategories = req.user?.credentials?.softCategories || [];
+    
+    console.log('📊 [REPROCESS] Extracted values:');
+    console.log('   userEmail:', userEmail || 'MISSING');
+    console.log('   dbName from req.user:', dbName || 'MISSING');
+    console.log('   platform:', req.user?.platform || 'MISSING');
+    console.log('   credentials present:', !!req.user?.credentials);
+    
+    if (!dbName) {
+      console.log('❌ [REPROCESS] ERROR: dbName is missing from authenticated user!');
+      console.log('   Full req.user:', JSON.stringify(req.user, null, 2));
+      return res.status(400).json({ 
+        error: "missing dbName",
+        details: "User record does not have dbName. Please re-onboard."
+      });
+    }
     
     console.log('📥 Received reprocess request from:', userEmail);
     console.log('   dbName:', dbName);

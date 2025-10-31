@@ -16,10 +16,36 @@ const PORT = process.env.PORT || 3001;
 
 // Security middleware
 app.use(helmet());
-app.use(cors({
-  origin: process.env.ALLOWED_ORIGINS?.split(',') || ['http://localhost:3000'],
+
+// CORS configuration (allow local dev origins + .env overrides)
+const defaultAllowedOrigins = [
+  'http://localhost:3000',
+  'http://localhost:5500',
+  'http://localhost:5501',
+  'http://localhost:5502',
+  'http://127.0.0.1:3000',
+  'http://127.0.0.1:5500',
+  'http://127.0.0.1:5501',
+  'http://127.0.0.1:5502'
+];
+
+const envAllowed = process.env.ALLOWED_ORIGINS?.split(',').map(s => s.trim()).filter(Boolean) || [];
+const allowedOrigins = [...new Set([...defaultAllowedOrigins, ...envAllowed])];
+
+const corsOptions = {
+  origin: function(origin, callback) {
+    if (!origin) return callback(null, true); // allow non-browser requests
+    if (allowedOrigins.includes(origin) || /^http:\/\/(localhost|127\.0\.0\.1)(:\\d+)?$/.test(origin)) {
+      return callback(null, true);
+    }
+    return callback(new Error('Not allowed by CORS'));
+  },
   credentials: true
-}));
+};
+
+app.use(cors(corsOptions));
+// Enable preflight across the board
+app.options('*', cors(corsOptions));
 
 // Rate limiting
 const limiter = rateLimit({
@@ -31,6 +57,21 @@ app.use(limiter);
 // Body parsing
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+// Request logging middleware
+app.use((req, res, next) => {
+  const timestamp = new Date().toISOString();
+  console.log(`\n${'='.repeat(60)}`);
+  console.log(`📨 [${timestamp}] ${req.method} ${req.path}`);
+  console.log(`   Origin: ${req.headers.origin || 'N/A'}`);
+  console.log(`   User-Agent: ${req.headers['user-agent']?.substring(0, 50) || 'N/A'}`);
+  console.log(`   API Key: ${req.headers['x-api-key'] ? '✓ Present' : '✗ Missing'}`);
+  if (Object.keys(req.query).length > 0) {
+    console.log(`   Query:`, req.query);
+  }
+  console.log(`${'='.repeat(60)}\n`);
+  next();
+});
 
 // Public routes (no auth required)
 app.use('/health', healthRouter);

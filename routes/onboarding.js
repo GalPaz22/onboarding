@@ -323,32 +323,105 @@ async function createAutocompleteIndex(client, dbName) {
 /* ------------------------------------------------------------------ */
 router.post('/', async (req, res) => {
   try {
-    /* 1)  Extract user email from request body (required) */
-    const {
-      platform,
-      shopifyDomain,
-      shopifyToken,
-      wooUrl,
-      wooKey,
-      wooSecret,
-      dbName,
-      categories,
-      syncMode,
-      type, 
-      context,
-      explain,
-      softCategories,
-      userEmail
-      // "text" | "image"
-    } = req.body;
+    // Check if API key is provided (re-onboarding scenario)
+    const apiKey = req.headers['x-api-key'] || req.query.api_key;
+    let existingUser = null;
+    let isReOnboarding = false;
+    
+    console.log('📊 [ONBOARDING] Starting onboarding:');
+    console.log('   API key present:', !!apiKey);
+    
+    // If API key provided, try to load existing user
+    if (apiKey) {
+      try {
+        const client = await clientPromise;
+        const usersDb = client.db('users');
+        const usersCollection = usersDb.collection('users');
+        existingUser = await usersCollection.findOne({ apiKey: apiKey });
+        
+        if (existingUser) {
+          isReOnboarding = true;
+          console.log('✅ [ONBOARDING] Found existing user via API key:', existingUser.email);
+          console.log('   Will use stored credentials as defaults');
+        } else {
+          console.log('⚠️  [ONBOARDING] API key provided but user not found');
+        }
+      } catch (error) {
+        console.error('❌ [ONBOARDING] Error looking up user:', error);
+      }
+    }
+    
+    /* 1) Extract from request body OR use stored values */
+    const bodyData = req.body;
+    const headerEmail = req.headers['x-user-email'];
+    
+    // For re-onboarding: use stored values, allow body to override
+    let platform, shopifyDomain, shopifyToken, wooUrl, wooKey, wooSecret, dbName, categories, syncMode, type, context, explain, softCategories, userEmail;
+    
+    if (isReOnboarding && existingUser) {
+      // Use stored values as defaults
+      console.log('📋 [ONBOARDING] Using stored credentials from user:', existingUser.email);
+      userEmail = existingUser.email;
+      dbName = existingUser.dbName || existingUser.credentials?.dbName;
+      platform = existingUser.platform || (existingUser.credentials?.wooUrl ? 'woocommerce' : 'shopify');
+      syncMode = bodyData.syncMode || existingUser.syncMode || 'full';
+      categories = bodyData.categories || existingUser.credentials?.categories || [];
+      type = bodyData.type || existingUser.credentials?.type || [];
+      softCategories = bodyData.softCategories || existingUser.credentials?.softCategories || [];
+      context = bodyData.context || existingUser.context;
+      explain = bodyData.explain !== undefined ? bodyData.explain : existingUser.explain;
+      
+      // Get platform credentials from stored data
+      if (platform === 'shopify') {
+        shopifyDomain = bodyData.shopifyDomain || existingUser.credentials?.shopifyDomain;
+        shopifyToken = bodyData.shopifyToken || existingUser.credentials?.shopifyToken;
+      } else {
+        wooUrl = bodyData.wooUrl || existingUser.credentials?.wooUrl;
+        wooKey = bodyData.wooKey || existingUser.credentials?.wooKey;
+        wooSecret = bodyData.wooSecret || existingUser.credentials?.wooSecret;
+      }
+      
+      console.log('   Loaded from stored: platform:', platform, 'dbName:', dbName);
+    } else {
+      // First-time onboarding: require everything from body
+      console.log('📋 [ONBOARDING] First-time onboarding, reading from body');
+      platform = bodyData.platform;
+      shopifyDomain = bodyData.shopifyDomain;
+      shopifyToken = bodyData.shopifyToken;
+      wooUrl = bodyData.wooUrl;
+      wooKey = bodyData.wooKey;
+      wooSecret = bodyData.wooSecret;
+      dbName = bodyData.dbName;
+      categories = bodyData.categories;
+      syncMode = bodyData.syncMode;
+      type = bodyData.type;
+      context = bodyData.context;
+      explain = bodyData.explain;
+      softCategories = bodyData.softCategories;
+      // Prefer body userEmail; allow proxy servers to inject via header
+      userEmail = bodyData.userEmail || headerEmail;
+    }
 
     // Validate required fields
+    console.log('📊 [ONBOARDING] Validating fields:');
+    console.log('   dbName:', dbName || 'MISSING');
+    console.log('   userEmail:', userEmail || 'MISSING');
+    console.log('   platform:', platform || 'MISSING');
+    
     if (!dbName) {
-      return res.status(400).json({ error: "missing dbName" });
+      console.log('❌ [ONBOARDING] ERROR: dbName is missing!');
+      return res.status(400).json({ 
+        error: "missing dbName",
+        hint: isReOnboarding ? "User record has no dbName. Please provide it in body." : "dbName is required for first-time onboarding"
+      });
     }
 
     if (!userEmail) {
-      return res.status(400).json({ error: "missing userEmail" });
+      console.log('❌ [ONBOARDING] ERROR: userEmail is missing!');
+      return res.status(400).json({ 
+        error: "missing userEmail",
+        hint: "userEmail is required (can be provided in body or x-user-email header by your server)"
+      });
     }
 
     // Debug logging for type parameter
@@ -402,17 +475,22 @@ router.post('/', async (req, res) => {
     const client = await clientPromise;
     const users = client.db("users").collection("users");
 
-    // Check if the user already has a record in the database
-    const existingUser = await users.findOne({ email: userEmail });
+    // Check if the user already has a record (if not already loaded)
+    if (!existingUser) {
+      existingUser = await users.findOne({ email: userEmail });
+    }
     const isFirstTimeOnboarding = !existingUser?.onboardingComplete;
     
-    // Generate API key for new users, or keep existing one
-    let apiKey = existingUser?.apiKey;
+    // Generate API key for new users, or keep existing one (use the one from re-onboarding check if available)
     if (!apiKey) {
-      apiKey = generateApiKey();
-      console.log('🔑 Generated new API key for user:', userEmail);
+      apiKey = existingUser?.apiKey || generateApiKey();
+      if (!existingUser?.apiKey) {
+        console.log('🔑 Generated new API key for user:', userEmail);
+      } else {
+        console.log('🔑 Using existing API key');
+      }
     } else {
-      console.log('🔑 User already has API key');
+      console.log('🔑 User already has API key (from re-onboarding)');
     }
 
     // Remove platform from credentials.
@@ -515,8 +593,22 @@ router.post('/', async (req, res) => {
 /* /api/onboarding/status - Uses API key to identify user            */
 router.get('/status', authenticateRequest, async (req, res) => {
   try {
+    console.log('📊 [STATUS] Authenticated user data:');
+    console.log('   req.user.email:', req.user?.email || 'MISSING');
+    console.log('   req.user.dbName:', req.user?.dbName || 'MISSING');
+    console.log('   req.user.platform:', req.user?.platform || 'MISSING');
+    
     // User is authenticated, use their dbName from the stored credentials
     const dbName = req.user.dbName;
+    
+    if (!dbName) {
+      console.log('❌ [STATUS] ERROR: dbName is missing from authenticated user!');
+      console.log('   Full req.user:', JSON.stringify(req.user, null, 2));
+      return res.status(400).json({ 
+        error: "missing dbName",
+        details: "User record does not have dbName. Please re-onboard."
+      });
+    }
     
     console.log('📊 Checking status for user:', req.user.email, 'dbName:', dbName);
 
