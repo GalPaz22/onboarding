@@ -8,6 +8,7 @@
   },
   "dependencies": {
     "@google/genai": "^1.28.0",
+    "@langchain/core": "^1.0.2",
     "@langchain/openai": "^1.0.0",
     "@woocommerce/woocommerce-rest-api": "^1.0.2",
     "axios": "^1.6.0",
