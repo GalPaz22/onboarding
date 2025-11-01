@@ -535,10 +535,18 @@ router.post('/', async (req, res) => {
 
     // Process sync synchronously with timeout protection
     let logs = [];
+    const syncStartTime = Date.now();
     try {
-      console.log("🔍 [Onboarding API] Starting sync processing with:");
-      console.log("🔍 [Onboarding API] Final type parameter:", type);
-      console.log("🔍 [Onboarding API] Final categories parameter:", categories);
+      console.log('\n' + '='.repeat(80));
+      console.log("🚀 [ONBOARDING] Starting sync processing");
+      console.log("   User:", userEmail);
+      console.log("   Platform:", platform);
+      console.log("   Database:", dbName);
+      console.log("   Sync Mode:", syncMode);
+      console.log("   Categories:", categories?.length || 0);
+      console.log("   Types:", type?.length || 0);
+      console.log("   Soft Categories:", softCategories?.length || 0);
+      console.log('='.repeat(80) + '\n');
       
       if (platform === "woocommerce") {
         console.log("🔍 [Onboarding API] Calling WooCommerce processing...");
@@ -559,22 +567,37 @@ router.post('/', async (req, res) => {
           logs = await processShopify({ shopifyDomain, shopifyToken, dbName, categories, userTypes: type, softCategories });
         }
       }
-       await setJobState(dbName, "done");
+      await setJobState(dbName, "done");
 
-       // Log the collected messages from the sync process.
-       console.log("Sync logs:", logs);
-       
-       return res.status(200).json({ 
-         success: true, 
-         state: "done",
-         isNewTrial: isFirstTimeOnboarding,
-         apiKey: apiKey, // Return API key to user
-         logs: logs
-       });
-       
-     } catch (err) {
-       console.error("sync error", err);
-       await setJobState(dbName, "error");
+      const syncDuration = ((Date.now() - syncStartTime) / 1000).toFixed(2);
+      
+      console.log('\n' + '='.repeat(80));
+      console.log("✅ [ONBOARDING] Sync processing completed successfully");
+      console.log("   User:", userEmail);
+      console.log("   Database:", dbName);
+      console.log("   Duration:", syncDuration, "seconds");
+      console.log("   Products processed:", logs.length);
+      console.log('='.repeat(80) + '\n');
+      
+      return res.status(200).json({ 
+        success: true, 
+        state: "done",
+        isNewTrial: isFirstTimeOnboarding,
+        apiKey: apiKey, // Return API key to user
+        logs: logs
+      });
+      
+    } catch (err) {
+      const syncDuration = ((Date.now() - syncStartTime) / 1000).toFixed(2);
+      console.error('\n' + '='.repeat(80));
+      console.error("❌ [ONBOARDING] Sync processing failed");
+      console.error("   User:", userEmail);
+      console.error("   Database:", dbName);
+      console.error("   Duration:", syncDuration, "seconds");
+      console.error("   Error:", err.message);
+      console.error("   Stack:", err.stack);
+      console.error('='.repeat(80) + '\n');
+      await setJobState(dbName, "error");
        
        return res.status(500).json({ 
          success: false, 
@@ -585,6 +608,34 @@ router.post('/', async (req, res) => {
   } catch (err) {
     console.error("[onboarding error]", err);
     return res.status(500).json({ error: "Something went wrong" });
+  }
+});
+
+/* ------------------------------------------------------------------ */
+/* Stop onboarding endpoint */
+router.post('/stop', authenticateRequest, async (req, res) => {
+  try {
+    const dbName = req.user.dbName;
+    const userEmail = req.user.email;
+    
+    console.log('\n' + '='.repeat(80));
+    console.log('🛑 [ONBOARDING STOP] Stop request received');
+    console.log('   User:', userEmail);
+    console.log('   Database:', dbName);
+    console.log('='.repeat(80) + '\n');
+    
+    await setJobState(dbName, "stopped");
+    
+    res.json({ 
+      message: "Stop signal sent. Onboarding will halt gracefully.",
+      user: {
+        email: userEmail,
+        dbName: dbName
+      }
+    });
+  } catch (error) {
+    console.error('❌ [ONBOARDING STOP] Error:', error);
+    res.status(500).json({ error: error.message });
   }
 });
 

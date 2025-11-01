@@ -457,6 +457,9 @@
             <button class="btn btn-primary" onclick="startOnboarding()" id="onboardingBtn">
                 <span>Start Onboarding</span>
             </button>
+            <button class="btn btn-secondary" onclick="stopOnboarding()" style="margin-left: 10px;" id="stopOnboardingBtn">
+                <span>🛑 Stop Onboarding</span>
+            </button>
 
             <div id="apiKeyDisplay" class="api-key-display">
                 <strong>🎉 Your API Key (Save this!):</strong>
@@ -589,8 +592,12 @@
             <button class="btn btn-secondary" onclick="stopReprocess()" style="margin-left: 10px;">
                 <span>🛑 Stop Reprocessing</span>
             </button>
+            <button class="btn btn-secondary" onclick="fetchLogs()" style="margin-left: 10px;">
+                <span>📋 View Logs</span>
+            </button>
 
             <div id="reprocessResponse" class="response-box"></div>
+            <div id="logsDisplay" class="response-box"></div>
         </div>
     </div>
 
@@ -731,6 +738,40 @@
             });
         }
 
+        async function stopOnboarding() {
+            const apiKey = getApiKey();
+            if (!apiKey) {
+                alert('⚠️ Please enter your API key in the configuration section first!\n\nNote: You need to have an API key from a previous onboarding to stop an ongoing process.');
+                return;
+            }
+
+            if (!confirm('Are you sure you want to stop the onboarding process?')) {
+                return;
+            }
+
+            try {
+                console.log('🛑 Sending stop signal for onboarding...');
+
+                const response = await fetch(`${getBaseUrl()}/api/onboarding/stop`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'x-api-key': apiKey
+                    }
+                });
+
+                const data = await response.json();
+                showResponse('onboardingResponse', data, !response.ok);
+                
+                if (response.ok) {
+                    console.log('✅ Stop signal sent successfully for onboarding');
+                }
+            } catch (error) {
+                console.error('❌ Stop onboarding error:', error);
+                showResponse('onboardingResponse', { error: error.message }, true);
+            }
+        }
+
         async function checkStatus() {
             const apiKey = getApiKey();
             if (!apiKey) {
@@ -859,6 +900,57 @@
             } catch (error) {
                 console.error('❌ Stop reprocess error:', error);
                 showResponse('reprocessResponse', { error: error.message }, true);
+            }
+        }
+
+        async function fetchLogs() {
+            const apiKey = getApiKey();
+            if (!apiKey) {
+                alert('⚠️ Please enter your API key in the configuration section first!');
+                return;
+            }
+
+            try {
+                console.log('📋 Fetching logs...');
+
+                const response = await fetch(`${getBaseUrl()}/api/reprocess/logs`, {
+                    method: 'GET',
+                    headers: {
+                        'x-api-key': apiKey
+                    }
+                });
+
+                const data = await response.json();
+                
+                if (response.ok) {
+                    const logsDisplay = document.getElementById('logsDisplay');
+                    logsDisplay.className = `response-box show ${data.state === 'error' ? 'error' : 'success'}`;
+                    
+                    let logsHtml = `<h4>📋 Processing Logs</h4>`;
+                    logsHtml += `<div style="margin-bottom: 10px;">
+                        <strong>State:</strong> ${data.state} | 
+                        <strong>Progress:</strong> ${data.progress}% | 
+                        <strong>Done:</strong> ${data.done}/${data.total}
+                    </div>`;
+                    
+                    if (data.logs && data.logs.length > 0) {
+                        logsHtml += `<div class="response-content" style="max-height: 400px; overflow-y: auto;">`;
+                        data.logs.forEach(log => {
+                            logsHtml += `${log}\n`;
+                        });
+                        logsHtml += `</div>`;
+                    } else {
+                        logsHtml += `<div class="response-content">No logs available yet.</div>`;
+                    }
+                    
+                    logsDisplay.innerHTML = logsHtml;
+                    console.log('✅ Logs fetched successfully');
+                } else {
+                    showResponse('logsDisplay', data, true);
+                }
+            } catch (error) {
+                console.error('❌ Fetch logs error:', error);
+                showResponse('logsDisplay', { error: error.message }, true);
             }
         }
     </script>

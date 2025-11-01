@@ -99,15 +99,69 @@ router.post('/', async (req, res) => {
 });
 
 async function processReprocessInBackground(payload) {
+  const startTime = Date.now();
+  console.log('\n' + '='.repeat(80));
+  console.log('🔄 [REPROCESS BACKGROUND] Starting reprocessing job');
+  console.log('   User:', payload.userEmail);
+  console.log('   Database:', payload.dbName);
+  console.log('   Categories:', payload.categories?.length || 0);
+  console.log('   Types:', payload.userTypes?.length || 0);
+  console.log('   Options:', JSON.stringify(payload.options, null, 2));
+  console.log('='.repeat(80) + '\n');
+  
   try {
     await reprocessProducts(payload);
+    const duration = ((Date.now() - startTime) / 1000).toFixed(2);
     await setJobState(payload.dbName, "done");
-    console.log("✅ Reprocessing completed");
+    console.log('\n' + '='.repeat(80));
+    console.log('✅ [REPROCESS BACKGROUND] Reprocessing completed successfully');
+    console.log('   Duration:', duration, 'seconds');
+    console.log('   User:', payload.userEmail);
+    console.log('   Database:', payload.dbName);
+    console.log('='.repeat(80) + '\n');
   } catch (err) {
-    console.error("❌ Reprocessing error:", err);
+    const duration = ((Date.now() - startTime) / 1000).toFixed(2);
+    console.error('\n' + '='.repeat(80));
+    console.error('❌ [REPROCESS BACKGROUND] Reprocessing failed');
+    console.error('   Duration:', duration, 'seconds');
+    console.error('   User:', payload.userEmail);
+    console.error('   Database:', payload.dbName);
+    console.error('   Error:', err.message);
+    console.error('   Stack:', err.stack);
+    console.error('='.repeat(80) + '\n');
     await setJobState(payload.dbName, "error");
   }
 }
+
+// Get logs endpoint - fetch real-time logs from database
+router.get('/logs', async (req, res) => {
+  try {
+    const dbName = req.user.dbName;
+    const userEmail = req.user.email;
+    
+    console.log('📋 [LOGS] Fetching logs for:', userEmail, 'dbName:', dbName);
+    
+    const clientPromise = await import('../lib/mongodb.js');
+    const client = await clientPromise.default;
+    const db = client.db(dbName);
+    const statusCol = db.collection('sync_status');
+    
+    const status = await statusCol.findOne({ dbName });
+    
+    res.json({
+      state: status?.state || 'idle',
+      logs: status?.logs || [],
+      progress: status?.progress || 0,
+      done: status?.done || 0,
+      total: status?.total || 0,
+      startedAt: status?.startedAt,
+      finishedAt: status?.finishedAt
+    });
+  } catch (error) {
+    console.error('❌ [LOGS] Error fetching logs:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
 
 // Stop endpoint
 router.post('/stop', async (req, res) => {
@@ -116,7 +170,11 @@ router.post('/stop', async (req, res) => {
     const dbName = req.user.dbName;
     const userEmail = req.user.email;
     
-    console.log('🛑 Stop request from:', userEmail, 'for dbName:', dbName);
+    console.log('\n' + '='.repeat(80));
+    console.log('🛑 [STOP] Stop request received');
+    console.log('   User:', userEmail);
+    console.log('   Database:', dbName);
+    console.log('='.repeat(80) + '\n');
     
     const fs = await import('fs/promises');
     const path = await import('path');
@@ -125,20 +183,35 @@ router.post('/stop', async (req, res) => {
     const LOCK_DIR = os.tmpdir();
     const lockFilePath = path.join(LOCK_DIR, `reprocessing_${dbName}.lock`);
     
-    await fs.unlink(lockFilePath);
-    res.json({ 
-      message: "Stop signal sent.",
-      user: {
-        email: userEmail,
-        dbName: dbName
+    console.log('🔍 [STOP] Checking lock file:', lockFilePath);
+    
+    try {
+      await fs.access(lockFilePath);
+      console.log('✅ [STOP] Lock file exists, removing...');
+      await fs.unlink(lockFilePath);
+      console.log('✅ [STOP] Lock file removed successfully');
+      
+      // Also update the status in database
+      await setJobState(dbName, "stopped");
+      
+      res.json({ 
+        message: "Stop signal sent successfully. Processing will halt after current product.",
+        user: {
+          email: userEmail,
+          dbName: dbName
+        }
+      });
+    } catch (accessError) {
+      if (accessError.code === 'ENOENT') {
+        console.log('ℹ️  [STOP] Lock file does not exist - process already stopped or finished');
+        res.json({ message: "Process already stopped or finished." });
+      } else {
+        throw accessError;
       }
-    });
-  } catch (error) {
-    if (error.code === "ENOENT") {
-      res.json({ message: "Process already stopped or finished." });
-    } else {
-      res.status(500).json({ error: error.message });
     }
+  } catch (error) {
+    console.error('❌ [STOP] Error:', error);
+    res.status(500).json({ error: error.message });
   }
 });
 
