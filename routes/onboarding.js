@@ -332,17 +332,23 @@ router.post('/', async (req, res) => {
     console.log('   API key present:', !!apiKey);
     
     // If API key provided, try to load existing user
+    // IMPORTANT: This is a SINGLE LOOKUP by API key
+    // The API key document contains BOTH email AND credentials
+    // We do NOT look up email first, then fetch a separate user doc
     if (apiKey) {
       try {
         const client = await clientPromise;
         const usersDb = client.db('users');
         const usersCollection = usersDb.collection('users');
+        
+        // Single lookup: finds the user doc that contains apiKey, email, AND credentials
         existingUser = await usersCollection.findOne({ apiKey: apiKey });
         
         if (existingUser) {
           isReOnboarding = true;
           console.log('✅ [ONBOARDING] Found existing user via API key:', existingUser.email);
           console.log('   Will use stored credentials as defaults');
+          console.log('   Credentials loaded from THIS document (not a separate lookup)');
         } else {
           console.log('⚠️  [ONBOARDING] API key provided but user not found');
         }
@@ -359,11 +365,17 @@ router.post('/', async (req, res) => {
     let platform, shopifyDomain, shopifyToken, wooUrl, wooKey, wooSecret, dbName, categories, syncMode, type, context, explain, softCategories, userEmail;
     
     if (isReOnboarding && existingUser) {
-      // Use stored values as defaults
+      // ============================================================================
+      // RE-SYNC FLOW: All data comes from the SINGLE document found by API key above
+      // existingUser = the complete user document with email + credentials + settings
+      // NO additional database lookups happen here
+      // ============================================================================
+      
       // Email priority: stored user record > body > header
       userEmail = existingUser.email || bodyData.userEmail || headerEmail;
       console.log('📋 [ONBOARDING] Re-onboarding for user:', userEmail);
       
+      // Load settings from the API key document
       dbName = existingUser.dbName || existingUser.credentials?.dbName;
       platform = existingUser.platform || (existingUser.credentials?.wooUrl ? 'woocommerce' : 'shopify');
       syncMode = bodyData.syncMode || existingUser.syncMode || 'full';
@@ -373,17 +385,20 @@ router.post('/', async (req, res) => {
       context = bodyData.context || existingUser.context;
       explain = bodyData.explain !== undefined ? bodyData.explain : existingUser.explain;
       
-      // Get platform credentials from stored data
+      // Get platform credentials from the SAME document (existingUser.credentials)
+      // These were stored during first onboarding and are now loaded directly
       if (platform === 'shopify') {
         shopifyDomain = bodyData.shopifyDomain || existingUser.credentials?.shopifyDomain;
         shopifyToken = bodyData.shopifyToken || existingUser.credentials?.shopifyToken;
       } else {
+        // WooCommerce credentials: wooUrl, wooKey, wooSecret
         wooUrl = bodyData.wooUrl || existingUser.credentials?.wooUrl;
         wooKey = bodyData.wooKey || existingUser.credentials?.wooKey;
         wooSecret = bodyData.wooSecret || existingUser.credentials?.wooSecret;
       }
       
       console.log('   Loaded from stored: platform:', platform, 'dbName:', dbName, 'email:', userEmail);
+      console.log('   All credentials extracted from the API key document');
     } else {
       // First-time onboarding: require everything from body
       console.log('📋 [ONBOARDING] First-time onboarding, reading from body');
