@@ -472,6 +472,68 @@
             <div id="onboardingResponse" class="response-box"></div>
         </div>
 
+        <!-- Re-sync -->
+        <div class="api-section">
+            <h2>
+                🔄 Re-sync (Re-onboard)
+                <span class="badge auth-required">Auth Required</span>
+            </h2>
+            <div class="info-box">
+                <p><strong>🔑 API Key-Based Re-onboarding:</strong> Re-run the full onboarding process using your existing API key.</p>
+                <p>✅ Uses your stored credentials automatically - no need to re-enter them!</p>
+                <p>✅ Optionally override sync mode, categories, or credentials below.</p>
+                <p>📝 Leave fields empty to use your stored settings.</p>
+            </div>
+
+            <div class="form-row">
+                <div class="input-group">
+                    <label for="resyncMode">Sync Mode (optional - override)</label>
+                    <select id="resyncMode">
+                        <option value="">Use stored mode</option>
+                        <option value="full">Full Processing</option>
+                        <option value="image">Image Only</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="form-row">
+                <div class="input-group">
+                    <label for="resyncCategories">Categories (optional - override stored)</label>
+                    <textarea id="resyncCategories" placeholder="Leave empty to use stored categories"></textarea>
+                    <small style="color: #666;">Your stored categories will be used if empty</small>
+                </div>
+                <div class="input-group">
+                    <label for="resyncTypes">Types (optional - override stored)</label>
+                    <textarea id="resyncTypes" placeholder="Leave empty to use stored types"></textarea>
+                    <small style="color: #666;">Your stored types will be used if empty</small>
+                </div>
+                <div class="input-group">
+                    <label for="resyncSoftCategories">Soft Categories (optional - override stored)</label>
+                    <textarea id="resyncSoftCategories" placeholder="Leave empty to use stored soft categories"></textarea>
+                    <small style="color: #666;">Your stored soft categories will be used if empty</small>
+                </div>
+            </div>
+
+            <div style="background: #fff3cd; border-left: 4px solid #ffc107; padding: 15px; border-radius: 8px; margin: 20px 0;">
+                <p style="margin: 0; color: #856404;"><strong>💡 How Re-sync works:</strong></p>
+                <p style="margin: 5px 0 0 0; color: #856404;">
+                    1. Your API key identifies you<br>
+                    2. Server loads your stored credentials and settings<br>
+                    3. Re-runs full onboarding/sync with your products<br>
+                    4. Optionally override settings by filling fields above
+                </p>
+            </div>
+
+            <button class="btn btn-primary" onclick="startResync()">
+                <span>Start Re-sync</span>
+            </button>
+            <button class="btn btn-secondary" onclick="stopOnboarding()" style="margin-left: 10px;">
+                <span>🛑 Stop Re-sync</span>
+            </button>
+
+            <div id="resyncResponse" class="response-box"></div>
+        </div>
+
         <!-- Status Check -->
         <div class="api-section">
             <h2>
@@ -769,6 +831,52 @@
             } catch (error) {
                 console.error('❌ Stop onboarding error:', error);
                 showResponse('onboardingResponse', { error: error.message }, true);
+            }
+        }
+
+        async function startResync() {
+            const apiKey = getApiKey();
+            if (!apiKey) {
+                alert('⚠️ Please enter your API key in the configuration section first!\n\nRe-sync requires an existing API key to identify you and load your stored credentials.');
+                return;
+            }
+
+            try {
+                const payload = {};
+
+                // Optional overrides (leave empty to use stored values)
+                const syncMode = document.getElementById('resyncMode').value;
+                const cats = document.getElementById('resyncCategories').value.split(',').map(s => s.trim()).filter(Boolean);
+                const types = document.getElementById('resyncTypes').value.split(',').map(s => s.trim()).filter(Boolean);
+                const softCats = document.getElementById('resyncSoftCategories').value.split(',').map(s => s.trim()).filter(Boolean);
+
+                if (syncMode) payload.syncMode = syncMode;
+                if (cats.length) payload.categories = cats;
+                if (types.length) payload.type = types;
+                if (softCats.length) payload.softCategories = softCats;
+
+                console.log('🔄 Starting re-sync with API key authentication');
+                console.log('📦 Payload (overrides):', payload);
+
+                const response = await fetch(`${getBaseUrl()}/api/onboarding`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'x-api-key': apiKey  // Include API key for re-onboarding
+                    },
+                    body: JSON.stringify(payload)
+                });
+
+                const data = await response.json();
+                showResponse('resyncResponse', data, !response.ok);
+                
+                if (response.ok) {
+                    console.log('✅ Re-sync started successfully');
+                    console.log('📊 Response:', data);
+                }
+            } catch (error) {
+                console.error('❌ Re-sync error:', error);
+                showResponse('resyncResponse', { error: error.message }, true);
             }
         }
 

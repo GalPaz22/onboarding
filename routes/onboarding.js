@@ -360,8 +360,10 @@ router.post('/', async (req, res) => {
     
     if (isReOnboarding && existingUser) {
       // Use stored values as defaults
-      console.log('📋 [ONBOARDING] Using stored credentials from user:', existingUser.email);
-      userEmail = existingUser.email;
+      // Email priority: stored user record > body > header
+      userEmail = existingUser.email || bodyData.userEmail || headerEmail;
+      console.log('📋 [ONBOARDING] Re-onboarding for user:', userEmail);
+      
       dbName = existingUser.dbName || existingUser.credentials?.dbName;
       platform = existingUser.platform || (existingUser.credentials?.wooUrl ? 'woocommerce' : 'shopify');
       syncMode = bodyData.syncMode || existingUser.syncMode || 'full';
@@ -381,7 +383,7 @@ router.post('/', async (req, res) => {
         wooSecret = bodyData.wooSecret || existingUser.credentials?.wooSecret;
       }
       
-      console.log('   Loaded from stored: platform:', platform, 'dbName:', dbName);
+      console.log('   Loaded from stored: platform:', platform, 'dbName:', dbName, 'email:', userEmail);
     } else {
       // First-time onboarding: require everything from body
       console.log('📋 [ONBOARDING] First-time onboarding, reading from body');
@@ -418,6 +420,15 @@ router.post('/', async (req, res) => {
 
     if (!userEmail) {
       console.log('❌ [ONBOARDING] ERROR: userEmail is missing!');
+      if (isReOnboarding) {
+        console.log('   This is a re-onboarding request but stored user has no email');
+        console.log('   User record:', JSON.stringify(existingUser, null, 2));
+        return res.status(400).json({ 
+          error: "missing userEmail",
+          hint: "For re-sync: Your stored user record has no email. Please provide userEmail in the body or update your user record.",
+          details: "Email is needed to track who owns the products in the database."
+        });
+      }
       return res.status(400).json({ 
         error: "missing userEmail",
         hint: "userEmail is required (can be provided in body or x-user-email header by your server)"
@@ -624,15 +635,39 @@ router.post('/stop', authenticateRequest, async (req, res) => {
     console.log('   Database:', dbName);
     console.log('='.repeat(80) + '\n');
     
-    await setJobState(dbName, "stopped");
+    // Remove lock file to signal stop
+    const fs = await import('fs/promises');
+    const path = await import('path');
+    const os = await import('os');
     
-    res.json({ 
-      message: "Stop signal sent. Onboarding will halt gracefully.",
-      user: {
-        email: userEmail,
-        dbName: dbName
+    const LOCK_DIR = os.tmpdir();
+    const lockFilePath = path.join(LOCK_DIR, `onboarding_${dbName}.lock`);
+    
+    console.log('🔍 [ONBOARDING STOP] Checking lock file:', lockFilePath);
+    
+    try {
+      await fs.access(lockFilePath);
+      console.log('✅ [ONBOARDING STOP] Lock file exists, removing...');
+      await fs.unlink(lockFilePath);
+      console.log('✅ [ONBOARDING STOP] Lock file removed successfully');
+      
+      await setJobState(dbName, "stopped");
+      
+      res.json({ 
+        message: "Stop signal sent successfully. Onboarding will halt after current product.",
+        user: {
+          email: userEmail,
+          dbName: dbName
+        }
+      });
+    } catch (accessError) {
+      if (accessError.code === 'ENOENT') {
+        console.log('ℹ️  [ONBOARDING STOP] Lock file does not exist - process already stopped or finished');
+        res.json({ message: "Process already stopped or finished." });
+      } else {
+        throw accessError;
       }
-    });
+    }
   } catch (error) {
     console.error('❌ [ONBOARDING STOP] Error:', error);
     res.status(500).json({ error: error.message });
