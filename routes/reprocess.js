@@ -49,8 +49,42 @@ router.post('/', async (req, res) => {
       reprocessVariants,
       reprocessEmbeddings,
       reprocessDescriptions,
-      reprocessAll
+      reprocessAll,
+      incrementalMode,
+      incrementalSoftCategories
     } = req.body;
+
+    // Handle incremental mode - merge new soft categories with existing ones
+    let finalSoftCategories = softCategories || storedSoftCategories;
+    if (incrementalMode && incrementalSoftCategories && incrementalSoftCategories.length > 0) {
+      console.log('📊 [REPROCESS] Incremental mode detected');
+      console.log('   Current soft categories:', finalSoftCategories);
+      console.log('   New soft categories to add:', incrementalSoftCategories);
+
+      // Merge and remove duplicates
+      const mergedCategories = [...new Set([...finalSoftCategories, ...incrementalSoftCategories])];
+      finalSoftCategories = mergedCategories;
+
+      console.log('   Merged soft categories:', finalSoftCategories);
+
+      // Update user document with merged soft categories
+      try {
+        const clientPromise = await import('../lib/mongodb.js');
+        const client = await clientPromise.default;
+        const usersDb = client.db("users");
+        const usersCollection = usersDb.collection("users");
+
+        await usersCollection.updateOne(
+          { dbName: dbName },
+          { $set: { softCategories: mergedCategories } }
+        );
+        console.log(`✅ [REPROCESS] Updated user softCategories: added ${incrementalSoftCategories.length} new categories`);
+        console.log(`   New total soft categories: ${mergedCategories.length}`);
+      } catch (updateErr) {
+        console.error("⚠️ [REPROCESS] Failed to update user softCategories:", updateErr);
+        // Continue anyway - the reprocessing will still work
+      }
+    }
 
     await setJobState(dbName, "running");
 
@@ -59,9 +93,11 @@ router.post('/', async (req, res) => {
       userEmail, // Include userEmail from authenticated user
       categories: categories || storedCategories,
       userTypes: userTypes || storedTypes,
-      softCategories: softCategories || storedSoftCategories,
+      softCategories: finalSoftCategories,
       targetCategory: targetCategory || null,
       missingSoftCategoryOnly: missingSoftCategoryOnly || false,
+      incrementalMode: incrementalMode || false,
+      incrementalSoftCategories: incrementalSoftCategories || [],
       options: {
         reprocessHardCategories: reprocessHardCategories !== undefined ? reprocessHardCategories : true,
         reprocessSoftCategories: reprocessSoftCategories !== undefined ? reprocessSoftCategories : true,
@@ -77,7 +113,10 @@ router.post('/', async (req, res) => {
       dbName: payload.dbName,
       userEmail: payload.userEmail,
       categoriesCount: payload.categories.length,
-      typesCount: payload.userTypes.length
+      typesCount: payload.userTypes.length,
+      softCategoriesCount: payload.softCategories.length,
+      incrementalMode: payload.incrementalMode || false,
+      incrementalSoftCategoriesCount: payload.incrementalSoftCategories?.length || 0
     });
 
     // Start processing in background
@@ -106,6 +145,11 @@ async function processReprocessInBackground(payload) {
   console.log('   Database:', payload.dbName);
   console.log('   Categories:', payload.categories?.length || 0);
   console.log('   Types:', payload.userTypes?.length || 0);
+  console.log('   Soft Categories:', payload.softCategories?.length || 0);
+  if (payload.incrementalMode) {
+    console.log('   🔄 INCREMENTAL MODE ACTIVE');
+    console.log('   New soft categories added:', payload.incrementalSoftCategories?.length || 0);
+  }
   console.log('   Options:', JSON.stringify(payload.options, null, 2));
   console.log('='.repeat(80) + '\n');
   
