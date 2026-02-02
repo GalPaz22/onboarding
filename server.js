@@ -6,7 +6,9 @@ import dotenv from 'dotenv';
 import onboardingRouter from './routes/onboarding.js';
 import reprocessRouter from './routes/reprocess.js';
 import healthRouter from './routes/health.js';
+import softCategoryAgentRouter from './routes/soft-category-agent.js';
 import { authenticateRequest } from './middleware/auth.js';
+import initializeScheduler from './lib/scheduler.js';
 
 // Load environment variables
 dotenv.config();
@@ -105,6 +107,7 @@ app.use('/api/onboarding', onboardingRouter); // Onboarding generates API key
 
 // Protected routes (require API key authentication)
 app.use('/api/reprocess', authenticateRequest, reprocessRouter);
+app.use('/api/soft-category-agent', authenticateRequest, softCategoryAgentRouter);
 
 // Error handling
 app.use((err, req, res, next) => {
@@ -118,5 +121,8 @@ app.use((err, req, res, next) => {
 app.listen(PORT, () => {
   console.log(`🚀 Processing service running on port ${PORT}`);
   console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
+
+  // Initialize scheduled tasks
+  initializeScheduler();
 });
 
