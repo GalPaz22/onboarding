@@ -17,9 +17,6 @@ const PORT = process.env.PORT || 3001;
 // Trust proxy - required for rate limiting behind reverse proxies (Render, Heroku, etc.)
 app.set('trust proxy', 1);
 
-// Security middleware
-app.use(helmet());
-
 // CORS configuration (allow local dev origins + .env overrides)
 const defaultAllowedOrigins = [
   'http://localhost:3000',
@@ -29,26 +26,52 @@ const defaultAllowedOrigins = [
   'http://127.0.0.1:3000',
   'http://127.0.0.1:5500',
   'http://127.0.0.1:5501',
-  'http://127.0.0.1:5502'
+  'http://127.0.0.1:5502',
+  'https://localhost:3000',
+  'https://127.0.0.1:3000'
 ];
 
 const envAllowed = process.env.ALLOWED_ORIGINS?.split(',').map(s => s.trim()).filter(Boolean) || [];
 const allowedOrigins = [...new Set([...defaultAllowedOrigins, ...envAllowed])];
 
+console.log('🔒 CORS allowed origins:', allowedOrigins);
+
 const corsOptions = {
   origin: function(origin, callback) {
-    if (!origin) return callback(null, true); // allow non-browser requests
-    if (allowedOrigins.includes(origin) || /^http:\/\/(localhost|127\.0\.0\.1)(:\\d+)?$/.test(origin)) {
+    // Allow requests with no origin (non-browser requests like Postman, curl, server-to-server)
+    if (!origin) {
+      console.log('✓ CORS: Allowing request with no origin header');
       return callback(null, true);
     }
-    return callback(new Error('Not allowed by CORS'));
+
+    // Check if origin is in allowed list or matches localhost pattern
+    const isAllowed = allowedOrigins.includes(origin) ||
+                      /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin);
+
+    if (isAllowed) {
+      console.log(`✓ CORS: Allowing origin: ${origin}`);
+      return callback(null, true);
+    }
+
+    console.warn(`✗ CORS: Blocking origin: ${origin}`);
+    console.warn(`  Allowed origins:`, allowedOrigins);
+    return callback(null, false); // Reject with false, not an Error
   },
-  credentials: true
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-API-Key', 'X-Requested-With'],
+  exposedHeaders: ['Content-Length', 'Content-Type']
 };
 
 app.use(cors(corsOptions));
 // Enable preflight across the board
 app.options('*', cors(corsOptions));
+
+// Security middleware (applied after CORS to avoid conflicts)
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: 'cross-origin' },
+  crossOriginOpenerPolicy: { policy: 'same-origin-allow-popups' }
+}));
 
 // Rate limiting
 const limiter = rateLimit({
