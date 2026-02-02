@@ -30,7 +30,10 @@ const defaultAllowedOrigins = [
   'http://127.0.0.1:5501',
   'http://127.0.0.1:5502',
   'https://localhost:3000',
-  'https://127.0.0.1:3000'
+  'https://127.0.0.1:3000',
+  'https://www.semantix.co.il',
+  'https://semantix-ai.com',
+  'https://www.semantix-ai.com'
 ];
 
 const envAllowed = process.env.ALLOWED_ORIGINS?.split(',').map(s => s.trim()).filter(Boolean) || [];
