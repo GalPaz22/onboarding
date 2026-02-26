@@ -9,6 +9,7 @@ import healthRouter from './routes/health.js';
 import softCategoryAgentRouter from './routes/soft-category-agent.js';
 import { authenticateRequest } from './middleware/auth.js';
 import initializeScheduler from './lib/scheduler.js';
+import { startCronSync } from './lib/cronSync.js';
 
 // Load environment variables
 dotenv.config();
@@ -127,5 +128,6 @@ app.listen(PORT, () => {
 
   // Initialize scheduled tasks
   initializeScheduler();
+  startCronSync();
 });
 
