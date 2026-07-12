@@ -362,7 +362,7 @@ router.post('/', async (req, res) => {
     const headerEmail = req.headers['x-user-email'];
     
     // For re-onboarding: use stored values, allow body to override
-    let platform, shopifyDomain, shopifyToken, wooUrl, wooKey, wooSecret, dbName, categories, syncMode, type, context, explain, softCategories, userEmail;
+    let platform, shopifyDomain, shopifyToken, wooUrl, wooKey, wooSecret, dbName, categories, syncMode, type, context, explain, softCategories, colors, userEmail;
     
     if (isReOnboarding && existingUser) {
       // ============================================================================
@@ -382,6 +382,7 @@ router.post('/', async (req, res) => {
       categories = bodyData.categories || existingUser.credentials?.categories || [];
       type = bodyData.type || existingUser.credentials?.type || [];
       softCategories = bodyData.softCategories || existingUser.credentials?.softCategories || [];
+      colors = bodyData.colors || existingUser.credentials?.colors || [];
       context = bodyData.context || existingUser.context;
       explain = bodyData.explain !== undefined ? bodyData.explain : existingUser.explain;
       
@@ -415,6 +416,7 @@ router.post('/', async (req, res) => {
       context = bodyData.context;
       explain = bodyData.explain;
       softCategories = bodyData.softCategories;
+      colors = bodyData.colors || [];
       // Prefer body userEmail; allow proxy servers to inject via header
       userEmail = bodyData.userEmail || headerEmail;
     }
@@ -581,7 +583,7 @@ router.post('/', async (req, res) => {
           logs = await processWooImages({ wooUrl, wooKey, wooSecret, userEmail, categories, userTypes: type, softCategories, dbName });
         } else {
           console.log("🔍 [Onboarding API] processWooProducts parameters:", { wooUrl: !!wooUrl, wooKey: !!wooKey, wooSecret: !!wooSecret, userEmail, categories, type, softCategories, dbName });
-          logs = await processWooProducts({ wooUrl, wooKey, wooSecret, userEmail, categories, userTypes: type, softCategories, dbName });
+          logs = await processWooProducts({ wooUrl, wooKey, wooSecret, userEmail, categories, userTypes: type, softCategories, colors, dbName });
         }
       } else if (platform === "shopify") {
         console.log("🔍 [Onboarding API] Calling Shopify processing...");
@@ -590,7 +592,7 @@ router.post('/', async (req, res) => {
           logs = await processShopifyImages({ shopifyDomain, shopifyToken, dbName, categories, userTypes: type, softCategories, context });
         } else {
           console.log("🔍 [Onboarding API] processShopify parameters:", { shopifyDomain: !!shopifyDomain, shopifyToken: !!shopifyToken, dbName, categories, type, softCategories });
-          logs = await processShopify({ shopifyDomain, shopifyToken, dbName, categories, userTypes: type, softCategories });
+          logs = await processShopify({ shopifyDomain, shopifyToken, dbName, categories, type, softCategories, colors });
         }
       }
       await setJobState(dbName, "done");
