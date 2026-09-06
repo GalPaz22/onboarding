@@ -8,7 +8,6 @@ import reprocessRouter from './routes/reprocess.js';
 import healthRouter from './routes/health.js';
 import softCategoryAgentRouter from './routes/soft-category-agent.js';
 import { authenticateRequest } from './middleware/auth.js';
-import initializeScheduler from './lib/scheduler.js';
 import { startCronSync } from './lib/cronSync.js';
 
 // Load environment variables
@@ -126,8 +125,7 @@ app.listen(PORT, () => {
   console.log(`🚀 Processing service running on port ${PORT}`);
   console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
 
-  // Initialize scheduled tasks
-  initializeScheduler();
+  // Initialize scheduled tasks (soft-category agent disabled)
   startCronSync();
 });
 
